@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 
@@ -13,6 +14,14 @@ class StartApp extends StatefulWidget {
 }
 
 class _StartAppState extends State<StartApp> {
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    SendRequestCurrentWeather();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -294,5 +303,16 @@ class _StartAppState extends State<StartApp> {
         ),
       ),
     );
+  }
+
+  void SendRequestCurrentWeather() async{
+    var apikey = "33199fbedb3ae7c66ce44cc662bca1ac";
+    var cityname = "tehran";
+    var response = await Dio().get("https://api.openweathermap.org/data/2.5/weather",
+    queryParameters: {"q":cityname, "appid":apikey, "units":"mrtric"}
+    );
+
+    print(response.data);
+    print(response.statusCode);
   }
 }
