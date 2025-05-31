@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 
+import 'package:simple_weather_app/Model/currentCityDataModel.dart';
+
 void main() {
   runApp(StartApp());
 }
@@ -14,7 +16,6 @@ class StartApp extends StatefulWidget {
 }
 
 class _StartAppState extends State<StartApp> {
-
   @override
   void initState() {
     // TODO: implement initState
@@ -305,14 +306,35 @@ class _StartAppState extends State<StartApp> {
     );
   }
 
-  void SendRequestCurrentWeather() async{
+  void SendRequestCurrentWeather() async {
     var apikey = "33199fbedb3ae7c66ce44cc662bca1ac";
     var cityname = "tehran";
-    var response = await Dio().get("https://api.openweathermap.org/data/2.5/weather",
-    queryParameters: {"q":cityname, "appid":apikey, "units":"mrtric"}
+    var response = await Dio().get(
+      "https://api.openweathermap.org/data/2.5/weather",
+      queryParameters: {"q": cityname, "appid": apikey, "units": "mrtric"},
     );
 
-    print(response.data);
-    print(response.statusCode);
+    // print(response.data);
+    // print(response.statusCode);
+
+    var datamodel = Currentcitydatamodel(
+      response.data["name"],
+      response.data["weather"][0]["main"],
+      response.data["weather"][0]["description"],
+      response.data["sys"]["country"],
+      response.data["coord"]["lon"],
+      response.data["coord"]["lat"],
+      response.data["main"]["temp"],
+      response.data["main"]["temp_min"],
+      response.data["main"]["temp_max"],
+      response.data["main"]["pressure"],
+      response.data["main"]["humidity"],
+      response.data["wind"]["speed"],
+      response.data["dt"],
+      response.data["sys"]["sunrise"],
+      response.data["sys"]["sunset"],
+    );
+
+    print(datamodel.country);
   }
 }
