@@ -3,6 +3,7 @@ class Currentcitydatamodel {
   String _main;
   String _description;
   String _country;
+  String _icon;
   var _lon;
   var _lat;
   var _temp;
@@ -20,6 +21,7 @@ class Currentcitydatamodel {
     this._main,
     this._description,
     this._country,
+    this._icon,
     this._lon,
     this._lat,
     this._temp,
@@ -38,6 +40,7 @@ class Currentcitydatamodel {
   String get main => _main;
   String get description => _description;
   String get country => _country;
+  String get icon => _icon;
   get lon => _lon;
   get lat => _lat;
   get temp => _temp;

@@ -138,13 +138,8 @@ class _StartAppState extends State<StartApp> {
                               fontWeight: FontWeight.w300,
                             ),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 30),
-                            child: Icon(
-                              Icons.sunny_snowing,
-                              color: Colors.white,
-                              size: 70,
-                            ),
+                          Image.network(
+                            "https://openweathermap.org/img/wn/${_currentWeather!.icon}@2x.png",
                           ),
                           Text(
                             "${_currentWeather!.temp}\u00b0",
@@ -398,6 +393,7 @@ class _StartAppState extends State<StartApp> {
         response.data["weather"][0]["main"],
         response.data["weather"][0]["description"],
         response.data["sys"]["country"],
+        response.data["weather"][0]["icon"],
         response.data["coord"]["lon"],
         response.data["coord"]["lat"],
         response.data["main"]["temp"],
