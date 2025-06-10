@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:intl/intl.dart';
 import 'package:simple_weather_app/Model/currentCityDataModel.dart';
+import 'package:simple_weather_app/Model/dailyForecastDataModel.dart';
 
 void main() {
   runApp(StartApp());
@@ -17,14 +18,125 @@ class StartApp extends StatefulWidget {
 
 class _StartAppState extends State<StartApp> {
   Currentcitydatamodel? _currentWeather;
+  List<DailyForecastDataModel> _dailyForecast = [];
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    SendRequestCurrentWeather();
+    sendRequestCurrentWeather();
   }
 
+void sendRequestCurrentWeather() async {
+  var apikey = "33199fbedb3ae7c66ce44cc662bca1ac";
+  var cityname = "tehran";
+
+  try {
+    var response = await Dio().get(
+      "https://api.openweathermap.org/data/2.5/weather",
+      queryParameters: {"q": cityname, "appid": apikey, "units": "metric"},
+    );
+
+    // --- این بخش کلیدی و اصلاح شده است ---
+
+    // 1. مقادیر lat و lon را مستقیماً از پاسخ API در متغیرهای محلی و امن ذخیره کن
+    final lat = response.data['coord']['lat'];
+    final lon = response.data['coord']['lon'];
+
+    // 2. حالا setState را برای آب و هوای فعلی صدا بزن
+    setState(() {
+      _currentWeather = Currentcitydatamodel(
+        response.data["name"],
+        response.data["weather"][0]["main"],
+        response.data["weather"][0]["description"],
+        response.data["sys"]["country"],
+        response.data["weather"][0]["icon"],
+        lat, // از متغیر محلی استفاده کن
+        lon, // از متغیر محلی استفاده کن
+        response.data["main"]["temp"],
+        response.data["main"]["temp_min"],
+        response.data["main"]["temp_max"],
+        response.data["main"]["pressure"],
+        response.data["main"]["humidity"],
+        response.data["wind"]["speed"],
+        response.data["dt"],
+        response.data["sys"]["sunrise"],
+        response.data["sys"]["sunset"],
+      );
+    });
+
+    // 3. تابع بعدی را با متغیرهای محلی و امن فراخوانی کن
+    sendRequestDailyForecast(lat, lon);
+
+  } catch (e) {
+    // اگر خطایی رخ دهد، اینجا چاپ می‌شود
+    print("Error fetching current weather: $e");
+  }
+}
+
+void sendRequestDailyForecast(num lat, num lon) async {
+  var apikey = "33199fbedb3ae7c66ce44cc662bca1ac";
+
+  try {
+    // مرحله ۱: درخواست به API جدید (/forecast)
+    var response = await Dio().get(
+      "https://api.openweathermap.org/data/2.5/forecast", // <-- API رایگان پیش‌بینی
+      queryParameters: {
+        "lat": lat,
+        "lon": lon,
+        "appid": apikey,
+        "units": "metric",
+      },
+    );
+
+    // مرحله ۲: پردازش و گروه‌بندی اطلاعات ۳ ساعته بر اساس روز
+    final List<dynamic> hourlyForecasts = response.data['list'];
+    final Map<String, List<dynamic>> dailyGroupedForecasts = {};
+
+    for (var forecast in hourlyForecasts) {
+      // تاریخ هر آیتم را به صورت "سال-ماه-روز" استخراج می‌کنیم
+      final String day = DateFormat('yyyy-MM-dd').format(
+          DateTime.fromMillisecondsSinceEpoch(forecast['dt'] * 1000));
+      
+      // اگر این روز در مپ ما وجود نداشت، یک لیست خالی برایش بساز
+      if (dailyGroupedForecasts[day] == null) {
+        dailyGroupedForecasts[day] = [];
+      }
+      // آیتم فعلی را به لیست آن روز اضافه کن
+      dailyGroupedForecasts[day]!.add(forecast);
+    }
+
+    // مرحله ۳: ساختن لیست نهایی اطلاعات روزانه
+    List<DailyForecastDataModel> processedDailyForecast = [];
+    dailyGroupedForecasts.forEach((day, forecastsForDay) {
+      // برای هر روز، بیشینه دما را پیدا می‌کنیم
+      num maxTemp = forecastsForDay
+          .map((item) => item['main']['temp'])
+          .reduce((a, b) => a > b ? a : b);
+      
+      // آیکون همان روز را از آیتم وسط روز (حدود ظهر) انتخاب می‌کنیم تا نماینده بهتری باشد
+      String icon = forecastsForDay[forecastsForDay.length ~/ 2]['weather'][0]['icon'];
+
+      processedDailyForecast.add(
+        DailyForecastDataModel(
+          // از تایم‌استمپ اولین آیتم آن روز برای نمایش تاریخ استفاده می‌کنیم
+          dateTime: forecastsForDay[0]['dt'],
+          temp: maxTemp,
+          icon: icon,
+        ),
+      );
+    });
+
+    // مرحله ۴: آپدیت کردن وضعیت (State) با لیست پردازش شده
+    setState(() {
+      // ما فقط ۵ روز آینده را می‌خواهیم
+      _dailyForecast = processedDailyForecast.take(5).toList();
+    });
+
+  } catch (e) {
+    print("Error fetching daily forecast: $e");
+  }
+}
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -210,39 +322,63 @@ class _StartAppState extends State<StartApp> {
                           SizedBox(height: 20),
                           Container(
                             width: double.infinity,
-                            height: 100,
-                            // color: Colors.white,
-                            // color: Colors.white,
+                            height: 105,
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
-                              itemCount: 7,
+                              itemCount:
+                                  _dailyForecast.isEmpty
+                                      ? 7
+                                      : _dailyForecast.length,
                               itemBuilder: (context, index) {
+                                if (_dailyForecast.isEmpty) {
+                                  return Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          width: 60,
+                                          height: 15,
+                                          color: Colors.white24,
+                                          margin: EdgeInsets.only(bottom: 8),
+                                        ),
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: Colors.white24,
+                                        ),
+                                        SizedBox(height: 8),
+                                        Container(
+                                          width: 40,
+                                          height: 15,
+                                          color: Colors.white24,
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                final dayData = _dailyForecast[index];
                                 return Padding(
                                   padding: const EdgeInsets.all(8.0),
                                   child: Column(
                                     children: [
                                       Text(
-                                        "Fri, 8pm",
+                                        DateFormat.EEEE().format(
+                                          DateTime.fromMillisecondsSinceEpoch(
+                                            dayData.dateTime * 1000,
+                                          ),
+                                        ),
                                         style: TextStyle(
                                           color: Colors.grey,
                                           fontSize: 13,
                                         ),
                                       ),
-                                      Icon(
-                                        Icons.cloud_queue_sharp,
-                                        color: Colors.white,
+                                      Image.network(
+                                        "https://openweathermap.org/img/wn/${dayData.icon}@2x.png",
+                                        width: 50,
+                                        height: 50,
                                       ),
                                       Text(
-                                        "12"
-                                        "\u00b0",
-                                        style: TextStyle(
-                                          color: const Color.fromARGB(
-                                            255,
-                                            255,
-                                            255,
-                                            255,
-                                          ),
-                                        ),
+                                        "${dayData.temp.round()}\u00b0",
+                                        style: TextStyle(color: Colors.white),
                                       ),
                                     ],
                                   ),
@@ -370,57 +506,5 @@ class _StartAppState extends State<StartApp> {
         ),
       ),
     );
-  }
-
-  void SendRequestCurrentWeather() async {
-    print("1. Starting the request..."); // 1. آیا متد اصلاً شروع می‌شود؟
-
-    var apikey = "33199fbedb3ae7c66ce44cc662bca1ac";
-    var cityname = "tehran";
-
-    try {
-      var response = await Dio().get(
-        "https://api.openweathermap.org/data/2.5/weather",
-        queryParameters: {"q": cityname, "appid": apikey, "units": "metric"},
-      );
-
-      print(
-        "2. Request successful. Response received.",
-      ); // 2. آیا درخواست موفق بود؟
-
-      var datamodel = Currentcitydatamodel(
-        response.data["name"],
-        response.data["weather"][0]["main"],
-        response.data["weather"][0]["description"],
-        response.data["sys"]["country"],
-        response.data["weather"][0]["icon"],
-        response.data["coord"]["lon"],
-        response.data["coord"]["lat"],
-        response.data["main"]["temp"],
-        response.data["main"]["temp_min"],
-        response.data["main"]["temp_max"],
-        response.data["main"]["pressure"],
-        response.data["main"]["humidity"],
-        response.data["wind"]["speed"],
-        response.data["dt"],
-        response.data["sys"]["sunrise"],
-        response.data["sys"]["sunset"],
-      );
-
-      print("3. Data model created successfully."); // 3. آیا مدل ساخته شد؟
-
-      setState(() {
-        print(
-          "4. Inside setState. Updating the state.",
-        ); // 4. آیا وارد setState می‌شویم؟
-        _currentWeather = datamodel;
-      });
-
-      print("5. setState has been called."); // 5. آیا setState تمام شد؟
-    } catch (e) {
-      print("---!!! AN ERROR OCCURRED !!!---");
-      print("The error is: $e");
-      print("---------------------------------");
-    }
   }
 }
